@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Copy, Wand2 } from "lucide-react";
+import { Loader2, Copy, Wand2, Key, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { improvePromptWithAI, improvePromptDemo } from "@/lib/prompt-improver";
 
 const PromptImprover = () => {
   const [prompt, setPrompt] = useState("");
   const [improvedPrompt, setImprovedPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [useDemo, setUseDemo] = useState(false);
   const { toast } = useToast();
 
   const improvePrompt = async () => {
@@ -22,45 +27,38 @@ const PromptImprover = () => {
 
     setIsLoading(true);
     try {
-      // For this demo, we'll simulate an AI improvement with some common enhancement patterns
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      let result;
       
-      let improved = prompt.trim();
-      
-      // Add more specific details
-      if (!improved.includes("detailed")) {
-        improved = "Create a detailed " + improved;
+      if (useDemo || !apiKey.trim()) {
+        // Use demo improvement
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        result = {
+          improvedPrompt: improvePromptDemo(prompt),
+          success: true
+        };
+      } else {
+        // Use AI improvement
+        result = await improvePromptWithAI({
+          originalPrompt: prompt,
+          apiKey: apiKey.trim()
+        });
       }
-      
-      // Add quality expectations
-      if (!improved.toLowerCase().includes("high quality")) {
-        improved += ", ensuring high quality output";
+
+      if (result.success) {
+        setImprovedPrompt(result.improvedPrompt);
+        toast({
+          title: "Prompt improved!",
+          description: useDemo 
+            ? "Your prompt has been enhanced with demo improvements." 
+            : "Your prompt has been enhanced using AI analysis.",
+        });
+      } else {
+        throw new Error(result.error || "Failed to improve prompt");
       }
-      
-      // Add style guidance if not present
-      if (!improved.includes("style")) {
-        improved += ", maintaining a professional and engaging style";
-      }
-      
-      // Add clarity about format if not specified
-      if (!improved.includes("format")) {
-        improved += ". Present the information in a clear, well-structured format";
-      }
-      
-      // Add request for examples if appropriate
-      if (!improved.includes("example")) {
-        improved += ", including relevant examples where appropriate";
-      }
-      
-      setImprovedPrompt(improved);
-      toast({
-        title: "Prompt improved!",
-        description: "Your prompt has been enhanced with more specific details and clarity.",
-      });
     } catch (error) {
       toast({
         title: "Error improving prompt",
-        description: "Please try again later",
+        description: error instanceof Error ? error.message : "Please try again later",
         variant: "destructive",
       });
     } finally {
@@ -91,18 +89,55 @@ const PromptImprover = () => {
           AI Prompt Improver
         </h1>
         <p className="text-muted-foreground">
-          Enter your prompt below and let AI help you make it better
+          Enter your prompt below and let AI help you make it better using advanced prompt engineering techniques
         </p>
       </div>
 
+      <Alert className="border-brand-200 bg-brand-50/50">
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          For best results, enter your <strong>Perplexity API key</strong> below. Without an API key, we'll use demo improvements.
+          <br />
+          <span className="text-xs text-muted-foreground mt-1 block">
+            Get your API key from <a href="https://www.perplexity.ai/settings/api" target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">Perplexity AI Settings</a>
+          </span>
+        </AlertDescription>
+      </Alert>
+
       <div className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium flex items-center gap-2">
+            <Key className="h-4 w-4" />
+            Perplexity API Key (Optional)
+          </label>
+          <Input
+            type="password"
+            placeholder="pplx-..."
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="font-mono text-sm"
+          />
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="useDemo"
+              checked={useDemo}
+              onChange={(e) => setUseDemo(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <label htmlFor="useDemo" className="text-sm text-muted-foreground">
+              Use demo mode (basic improvements without API)
+            </label>
+          </div>
+        </div>
+
         <div className="space-y-2">
           <label className="text-sm font-medium">Your Prompt</label>
           <Textarea
-            placeholder="Enter your prompt here..."
+            placeholder="Enter your prompt here... (e.g., 'Write a blog post about AI')"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            className="min-h-[100px] resize-none"
+            className="min-h-[120px] resize-none"
           />
         </div>
 
@@ -114,12 +149,12 @@ const PromptImprover = () => {
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Improving...
+              {useDemo || !apiKey.trim() ? "Applying demo improvements..." : "Analyzing with AI..."}
             </>
           ) : (
             <>
               <Wand2 className="mr-2 h-4 w-4" />
-              Improve Prompt
+              {useDemo || !apiKey.trim() ? "Improve Prompt (Demo)" : "Improve Prompt (AI)"}
             </>
           )}
         </Button>
@@ -143,8 +178,11 @@ const PromptImprover = () => {
               <Textarea
                 value={improvedPrompt}
                 readOnly
-                className="min-h-[100px] resize-none bg-transparent relative z-10"
+                className="min-h-[150px] resize-none bg-transparent relative z-10"
               />
+            </div>
+            <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+              <strong>Improvements applied:</strong> Enhanced specificity, added context requirements, improved structure guidelines, and optimized for better AI comprehension.
             </div>
           </div>
         )}
